@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CAMO-GEN Redirect</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: #202124;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      color: #e53e3e;
+    }
+    p {
+      font-size: 1.2rem;
+      margin-bottom: 2rem;
+      max-width: 600px;
+    }
+    .container {
+      background-color: rgba(0,0,0,0.2);
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .buttons {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .button {
+      background-color: #e53e3e;
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      font-size: 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color 0.2s;
+    }
+    .button:hover {
+      background-color: #c53030;
+    }
+    .button.secondary {
+      background-color: #4a5568;
+    }
+    .button.secondary:hover {
+      background-color: #2d3748;
+    }
+    #redirect-message {
+      font-size: 0.9rem;
+      margin-top: 2rem;
+      color: #a0aec0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>CAMO-GEN</h1>
+    <p>Development server should be running at <strong>http://localhost:3000</strong> or <strong>http://localhost:3001</strong></p>
+    
+    <div class="buttons">
+      <a href="http://localhost:3000" class="button" id="primary-button">Go to localhost:3000</a>
+      <a href="http://localhost:3001" class="button secondary" id="secondary-button">Try localhost:3001</a>
+    </div>
+    
+    <div id="redirect-message"></div>
+  </div>
+
+  <script>
+    // Check if servers are running
+    async function checkServer(port) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1000);
+        
+        const response = await fetch(`http://localhost:${port}`, {
+          mode: 'no-cors',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    // Auto-redirect to the working server
+    async function autoRedirect() {
+      const redirectMessage = document.getElementById('redirect-message');
+      redirectMessage.textContent = 'Checking available servers...';
+      
+      // Check primary port first (3000)
+      const primaryAvailable = await checkServer(3000);
+      if (primaryAvailable) {
+        redirectMessage.textContent = 'Redirecting to localhost:3000...';
+        setTimeout(() => {
+          window.location.href = 'http://localhost:3000';
+        }, 1500);
+        return;
+      }
+      
+      // Check secondary port (3001)
+      const secondaryAvailable = await checkServer(3001);
+      if (secondaryAvailable) {
+        redirectMessage.textContent = 'Redirecting to localhost:3001...';
+        setTimeout(() => {
+          window.location.href = 'http://localhost:3001';
+        }, 1500);
+        return;
+      }
+      
+      // No server available
+      redirectMessage.textContent = 'No development server detected. Please start the server with ./run.sh';
+    }
+    
+    // Start the auto-redirect process
+    autoRedirect();
+  </script>
+</body>
+</html> 
