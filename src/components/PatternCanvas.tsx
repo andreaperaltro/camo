@@ -197,23 +197,6 @@ export default function PatternCanvas({
         
         // Update prev settings reference
         prevSettingsRef.current = {...settings};
-
-        // Directly update the background if it exists
-        if (showSeamlessPreview) {
-          setTimeout(() => {
-            const bgElement = getOrCreatePatternBackground();
-            if (bgElement) {
-              bgElement.style.backgroundImage = `url("${dataUrl}")`;
-              bgElement.style.backgroundSize = `${tileSize}px ${tileSize}px`;
-              bgElement.style.backgroundRepeat = 'repeat';
-              bgElement.style.zIndex = fullscreenPreview ? '20' : '15';
-              bgElement.style.opacity = '1';
-              bgElement.style.visibility = 'visible';
-              bgElement.style.display = 'block';
-              debugPattern('Updated pattern from generate function');
-            }
-          }, 50);
-        }
       } catch (error) {
         console.error('Error generating pattern:', error);
       } finally {
@@ -222,7 +205,7 @@ export default function PatternCanvas({
     };
     
     generatePattern();
-  }, [settings, onAddToGallery, applyPostProcessing, showSeamlessPreview, tileSize, fullscreenPreview]);
+  }, [settings, onAddToGallery, applyPostProcessing]);
 
   // Download the pattern
   const downloadPattern = (format: ExportFormat) => {
@@ -289,90 +272,7 @@ export default function PatternCanvas({
     return svgData;
   };
 
-  // Enhanced direct DOM manipulation for pattern display - will run on every relevant state change
-  useEffect(() => {
-    // Only manipulate DOM when we have a pattern and seamless preview is enabled
-    if (patternDataUrl && showSeamlessPreview) {
-      debugPattern(`Direct DOM manipulation - Legacy callback`);
-    }
-  }, [patternDataUrl, showSeamlessPreview, tileSize, fullscreenPreview]);
-
-  // Fix tiling issues
-  useEffect(() => {
-    if (patternDataUrl && showSeamlessPreview) {
-      debugPattern('Updating background element');
-      
-      // Use a larger timeout to ensure DOM is ready
-      const timeoutId = setTimeout(() => {
-        const bgElement = getOrCreatePatternBackground();
-        if (bgElement) {
-          debugPattern('Found background element, updating styles');
-          bgElement.style.backgroundImage = `url('${patternDataUrl}')`;
-          bgElement.style.backgroundSize = `${tileSize}px ${tileSize}px`;
-          bgElement.style.backgroundRepeat = 'repeat';
-          bgElement.style.opacity = '1';
-          bgElement.style.visibility = 'visible';
-          bgElement.style.display = 'block';
-        }
-      }, 100);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [patternDataUrl, showSeamlessPreview, tileSize]);
-  
-  // Also ensure correct display when showSeamlessPreview changes
-  useEffect(() => {
-    if (showSeamlessPreview) {
-      setTimeout(() => {
-        const bgElement = getOrCreatePatternBackground();
-        if (bgElement && patternDataUrl) {
-          bgElement.style.backgroundImage = `url('${patternDataUrl}')`;
-          bgElement.style.display = 'block';
-          bgElement.style.visibility = 'visible';
-          bgElement.style.opacity = '1';
-          debugPattern('Showing seamless preview');
-        }
-      }, 50);
-    } else {
-      const bgElement = document.getElementById('pattern-background');
-      if (bgElement) {
-        bgElement.style.opacity = '0';
-        bgElement.style.visibility = 'hidden';
-        debugPattern('Hiding seamless preview');
-      }
-    }
-  }, [showSeamlessPreview, patternDataUrl]);
-
-  // Safely get pattern background element or create it if it doesn't exist
-  const getOrCreatePatternBackground = () => {
-    let element = document.getElementById('pattern-background');
-    
-    if (!element) {
-      debugPattern('Creating missing pattern background element');
-      const container = document.querySelector('.pattern-display-area');
-      
-      if (container) {
-        element = document.createElement('div');
-        element.id = 'pattern-background';
-        element.className = 'absolute inset-0';
-        element.style.position = 'absolute';
-        element.style.top = '0';
-        element.style.left = '0';
-        element.style.width = '100%';
-        element.style.height = '100%';
-        element.style.zIndex = fullscreenPreview ? '20' : '15';
-        
-        container.appendChild(element);
-        debugPattern('Successfully created new background element');
-      } else {
-        debugPattern('ERROR: Could not find container .pattern-display-area');
-      }
-    }
-    
-    return element;
-  };
-  
-  // Tile size slider controls
+  // Tile size slider controls - simplified for the new React-based approach
   const adjustTileSize = (increment: boolean) => {
     const newSize = increment 
       ? Math.min(tileSize + 16, 256) 
@@ -385,12 +285,77 @@ export default function PatternCanvas({
       onTileSizeChange(newSize);
     }
     
-    // Immediately update the background size
-    const backgroundElem = getOrCreatePatternBackground();
-    if (backgroundElem) {
-      backgroundElem.style.backgroundSize = `${newSize}px ${newSize}px`;
-      debugPattern(`Updated tile size to ${newSize}px`);
+    debugPattern(`Tile size adjusted to ${newSize}px`);
+  };
+
+  // Replace the current pattern background implementation with a simpler, more robust approach
+  const renderTiledBackground = () => {
+    if (!patternDataUrl || !showSeamlessPreview) return null;
+    
+    // Calculate tiles based on viewport size estimation
+    // For better performance, we'll calculate exactly how many tiles are needed rather than using a fixed number
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+    
+    // Add extra tiles to ensure coverage when scrolling/resizing
+    const tilesX = Math.ceil(viewportWidth / tileSize) + 2;
+    const tilesY = Math.ceil(viewportHeight / tileSize) + 2;
+    
+    // Create an array of tiles
+    const tiles = [];
+    // Only render what's needed based on screen size
+    const maxTiles = 1000; // Safety limit
+    let tileCount = 0;
+    
+    for (let y = 0; y < tilesY; y++) {
+      for (let x = 0; x < tilesX; x++) {
+        if (tileCount >= maxTiles) break;
+        
+        tiles.push(
+          <div
+            key={`tile-${x}-${y}`}
+            style={{
+              position: 'absolute',
+              left: `${x * tileSize}px`,
+              top: `${y * tileSize}px`,
+              width: `${tileSize}px`,
+              height: `${tileSize}px`,
+              backgroundImage: `url("${patternDataUrl}")`,
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              zIndex: 10,
+            }}
+          />
+        );
+        
+        tileCount++;
+      }
     }
+    
+    // Alternative approach for extremely large tile sizes
+    if (tileSize >= 200 || tiles.length === 0) {
+      return (
+        <div 
+          className="absolute inset-0 overflow-hidden"
+          style={{ 
+            zIndex: fullscreenPreview ? 20 : 15,
+            backgroundImage: `url("${patternDataUrl}")`,
+            backgroundRepeat: 'repeat',
+            backgroundSize: `${tileSize}px ${tileSize}px`,
+          }}
+        />
+      );
+    }
+    
+    // Standard approach for regular tile sizes
+    return (
+      <div 
+        className="absolute inset-0 overflow-hidden"
+        style={{ zIndex: fullscreenPreview ? 20 : 15 }}
+      >
+        {tiles}
+      </div>
+    );
   };
 
   return (
@@ -413,20 +378,8 @@ export default function PatternCanvas({
           zIndex: 5
         }}
       >
-        {/* Static background div that will be controlled by DOM manipulation */}
-        <div
-          className="absolute inset-0"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: fullscreenPreview ? 20 : 15,
-            display: showSeamlessPreview ? 'block' : 'none'
-          }}
-          id="pattern-background"
-        />
+        {/* New tiled background rendering approach */}
+        {renderTiledBackground()}
 
         {/* Loading overlay */}
         {isGenerating && (
