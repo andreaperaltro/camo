@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import PatternControls from '@/components/PatternControls';
 import PatternCanvas from '@/components/PatternCanvas';
 import PatternGallery from '@/components/PatternGallery';
-import { PatternSettings, PatternType } from '@/lib/patterns/types';
+import { PatternSettings } from '@/lib/patterns/types';
 import PatternFactory from '@/lib/patterns/patternFactory';
 
 export default function Home() {

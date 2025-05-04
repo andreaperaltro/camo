@@ -111,8 +111,8 @@ class PerlinNoise {
     public simplex2(x: number, y: number): number {
         // Find skew factors
         const s = (x + y) * this.F2;
-        let i = Math.floor(x + s);
-        let j = Math.floor(y + s);
+        const i = Math.floor(x + s);
+        const j = Math.floor(y + s);
         const t = (i + j) * this.G2;
         
         // Unskew the cell origin back to (x,y) space

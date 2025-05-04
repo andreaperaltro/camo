@@ -310,19 +310,15 @@ export default function PatternCanvas({
     }
   }, [patternDataUrl, fullscreenPreview, showSeamlessPreview, tileSize]);
 
-  // Change tile size
+  // Tile size slider controls
   const adjustTileSize = (increment: boolean) => {
-    const newSize = increment ? Math.min(tileSize + 32, 256) : Math.max(tileSize - 32, 64);
+    const newSize = increment 
+      ? Math.min(tileSize + 16, 256) 
+      : Math.max(tileSize - 16, 32);
+    
     setInternalTileSize(newSize);
-    if (onTileSizeChange) {
-      onTileSizeChange(newSize);
-    }
-  };
-
-  // Handle tile size change directly from the slider
-  const handleTileSizeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const newSize = parseInt(event.target.value, 10);
-    setInternalTileSize(newSize);
+    
+    // Call the callback if provided
     if (onTileSizeChange) {
       onTileSizeChange(newSize);
     }

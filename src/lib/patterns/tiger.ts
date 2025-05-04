@@ -99,8 +99,6 @@ export default class TigerStripePattern extends BasePattern {
     const noiseMap: number[][] = [];
     const noiseScale = 0.005 + (irregularity * 0.005);
     const gridSize = 4; // Resolution of the noise grid
-    const cellWidth = width / gridSize;
-    const cellHeight = height / gridSize;
     
     for (let y = 0; y < gridSize; y++) {
       noiseMap[y] = [];

@@ -9,7 +9,7 @@ export interface PatternOptions {
   colors: string[];
   contrast: number;
   sharpness: number;
-  [key: string]: any; // Allow additional pattern-specific options
+  [key: string]: number | string | string[] | boolean | undefined; // More specific than 'any'
 }
 
 // Canvas context type - for proper TypeScript typing
