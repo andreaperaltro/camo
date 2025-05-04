@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import PatternControls from '@/components/PatternControls';
 import PatternCanvas from '@/components/PatternCanvas';
 import PatternGallery from '@/components/PatternGallery';
@@ -9,7 +9,6 @@ import PatternFactory from '@/lib/patterns/patternFactory';
 
 export default function Home() {
   const hasInitializedRef = useRef(false);
-  const [initCount, setInitCount] = useState(0);
   const [windowDimensions, setWindowDimensions] = useState({
     width: typeof window !== 'undefined' ? window.innerWidth : 0,
     height: typeof window !== 'undefined' ? window.innerHeight : 0,
@@ -34,24 +33,6 @@ export default function Home() {
   
   // UI state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
-      // Force redraw the pattern on significant resize
-      if (Math.abs(windowDimensions.width - window.innerWidth) > 100 ||
-          Math.abs(windowDimensions.height - window.innerHeight) > 100) {
-        handleRegenerate();
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [windowDimensions]);
   
   // Handle changes to pattern settings
   const handleSettingsChange = useCallback((newSettings: Partial<PatternSettings>) => {
@@ -78,6 +59,35 @@ export default function Home() {
     });
   }, []);
   
+  // Handle window resize - moved after handleRegenerate is defined
+  useEffect(() => {
+    // Use a more efficient resize handling with debounce
+    let resizeTimer: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const newWidth = window.innerWidth;
+        const newHeight = window.innerHeight;
+        
+        // Only update if significant changes (reduces unnecessary renders)
+        if (Math.abs(windowDimensions.width - newWidth) > 100 ||
+            Math.abs(windowDimensions.height - newHeight) > 100) {
+          setWindowDimensions({
+            width: newWidth,
+            height: newHeight,
+          });
+          handleRegenerate();
+        }
+      }, 250); // Debounce time of 250ms
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimer);
+    };
+  }, [windowDimensions, handleRegenerate]);
+  
   // Add pattern to gallery with size limit
   const handleAddToGallery = useCallback((dataUrl: string) => {
     // Only add if it's not already in the gallery
@@ -99,25 +109,26 @@ export default function Home() {
     if (!hasInitializedRef.current) {
       hasInitializedRef.current = true;
       
-      // Force immediate regeneration
+      // Only need one regeneration call with a short delay
       setTimeout(() => {
         handleRegenerate();
       }, 200);
-      
-      // And another one after a delay to ensure it works
-      setTimeout(() => {
-        setInitCount(c => c + 1);
-      }, 1000);
     }
   }, [handleRegenerate]);
 
-  // Force regenerate when init count changes
-  useEffect(() => {
-    if (initCount > 0) {
-      handleRegenerate();
+  // Memoize serialized gallery data to prevent unnecessary re-serialization
+  const serializedGallery = useMemo(() => {
+    if (galleryItems.length === 0) return '';
+    try {
+      // Limit to 5 items for performance and storage quota
+      const limitedItems = galleryItems.slice(-5);
+      return JSON.stringify(limitedItems);
+    } catch (e) {
+      console.error('Failed to serialize gallery:', e);
+      return '';
     }
-  }, [initCount, handleRegenerate]);
-
+  }, [galleryItems]);
+  
   // Load gallery from localStorage on first load
   useEffect(() => {
     const savedGallery = localStorage.getItem('camo-gen-gallery');
@@ -130,28 +141,23 @@ export default function Home() {
     }
   }, []);
   
-  /**
-   * Save gallery to localStorage when it changes
-   * Handles localStorage quota limitations by limiting the number of saved items
-   */
+  // Save gallery to localStorage when it changes - optimized
   useEffect(() => {
-    if (galleryItems.length > 0) {
+    if (serializedGallery) {
       try {
-        // Limit number of gallery items to prevent quota issues
-        const limitedItems = galleryItems.slice(-5); // Only keep the most recent 5 patterns
-        localStorage.setItem('camo-gen-gallery', JSON.stringify(limitedItems));
+        localStorage.setItem('camo-gen-gallery', serializedGallery);
       } catch (e) {
         console.error('Failed to save gallery to localStorage:', e);
         // If we hit a quota error, try saving fewer items
         try {
-          const singleItem = galleryItems.slice(-1); // Just keep the latest one
-          localStorage.setItem('camo-gen-gallery', JSON.stringify(singleItem));
+          const singleItem = JSON.stringify(galleryItems.slice(-1));
+          localStorage.setItem('camo-gen-gallery', singleItem);
         } catch (retryError) {
           console.error('Still failed to save gallery to localStorage:', retryError);
         }
       }
     }
-  }, [galleryItems]);
+  }, [serializedGallery, galleryItems]);
   
   // Handle pattern selection from gallery
   const handleSelectPattern = useCallback((dataUrl: string) => {

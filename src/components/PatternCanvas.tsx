@@ -57,14 +57,6 @@ export default function PatternCanvas({
   
   const tileSize = propTileSize !== undefined ? propTileSize : internalTileSize;
   
-  // Initialize canvas 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      console.log('Canvas initialized with size:', canvas.width, canvas.height);
-    }
-  }, []);
-  
   // Memoize the post-processing function
   const applyPostProcessing = useCallback((
     canvas: HTMLCanvasElement, 
@@ -137,7 +129,6 @@ export default function PatternCanvas({
     // Skip checking for changes on initial render
     if (initialRenderRef.current) {
       initialRenderRef.current = false;
-      console.log('Initial render, generating pattern...');
     } else {
       // Check if we need to regenerate the pattern based on actual setting changes
       const shouldRegenerate = haveSettingsChanged(prevSettingsRef.current, settings);
@@ -277,36 +268,8 @@ export default function PatternCanvas({
   // Force pattern display with direct DOM manipulation (keep this for reliable display)
   useEffect(() => {
     if (patternDataUrl && fullscreenPreview && showSeamlessPreview) {
-      // Check if our direct pattern element already exists
-      let patternElement = document.getElementById('direct-pattern-element');
-      
-      if (!patternElement) {
-        // Create new element if it doesn't exist
-        patternElement = document.createElement('div');
-        patternElement.id = 'direct-pattern-element';
-        document.body.appendChild(patternElement);
-      }
-      
-      // Update the element styles
-      Object.assign(patternElement.style, {
-        position: 'fixed',
-        top: '0',
-        left: '0',
-        width: '100%',
-        height: '100%',
-        backgroundImage: `url("${patternDataUrl}")`,
-        backgroundRepeat: 'repeat',
-        backgroundSize: `${tileSize}px ${tileSize}px`,
-        zIndex: '5', // Low enough to be below UI elements
-        pointerEvents: 'none', // Allow clicking through to elements below
-      });
-      
-      // Clean up function
-      return () => {
-        if (patternElement && patternElement.parentNode) {
-          patternElement.parentNode.removeChild(patternElement);
-        }
-      };
+      // We don't need to create DOM elements directly since we're using React
+      // The pattern is already displayed via the patternDataUrl in the JSX return
     }
   }, [patternDataUrl, fullscreenPreview, showSeamlessPreview, tileSize]);
 
@@ -411,23 +374,6 @@ export default function PatternCanvas({
           </div>
         )}
       </div>
-      
-      {/* Guaranteed pattern display - keep this for reliable visibility */}
-      {fullscreenPreview && showSeamlessPreview && patternDataUrl && (
-        <div 
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundImage: `url("${patternDataUrl}")`,
-            backgroundRepeat: 'repeat',
-            backgroundSize: `${tileSize}px ${tileSize}px`,
-            zIndex: 10
-          }}
-        />
-      )}
       
       {/* Buttons for non-fullscreen mode */}
       {!fullscreenPreview && (
