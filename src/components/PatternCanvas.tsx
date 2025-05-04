@@ -52,7 +52,9 @@ export default function PatternCanvas({
   const initialRenderRef = useRef(true);
   const [downloadStatus, setDownloadStatus] = useState<string | null>(null);
   const [isSeamless, setIsSeamless] = useState(true);
-  const [patternDataUrl, setPatternDataUrl] = useState<string | null>(null);
+  // Emergency fallback pattern (a simple checkerboard)
+  const fallbackPattern = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAH0lEQVQYV2NkQAX/GZH4/xkYGBhhAmAOSBJEwDkgAQCCrgQEqRgDDwAAAABJRU5ErkJggg==';
+  const [patternDataUrl, setPatternDataUrl] = useState<string | null>(fallbackPattern);
   const [internalTileSize, setInternalTileSize] = useState(fullscreenPreview ? 128 : 128);
   
   // Debug logger for tiling preview issues
@@ -66,8 +68,59 @@ export default function PatternCanvas({
   useEffect(() => {
     console.log(`PatternCanvas rendered. fullscreenPreview: ${fullscreenPreview}, showSeamlessPreview: ${showSeamlessPreview}, tileSize: ${tileSize}`);
     console.log(`Has pattern data URL: ${!!patternDataUrl}`);
-  });
-  
+    
+    // Force seamless preview mode on for debugging if running locally
+    if (process.env.NODE_ENV === 'development' && !showSeamlessPreview) {
+      console.log('Forcing seamless preview mode on for debugging');
+      setShowSeamlessPreview(true);
+    }
+  }, []);
+
+  // Force initial pattern generation
+  useEffect(() => {
+    // Ensure we have a canvas
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      console.error('Canvas ref is not available yet');
+      return;
+    }
+
+    // If we don't have a pattern yet, create a simple one
+    if (patternDataUrl === fallbackPattern) {
+      console.log('Creating initial pattern since none exists yet');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        // Draw a simple pattern directly
+        const colors = ['#5e7240', '#4c5e3d', '#3a4934', '#262e21'];
+        
+        // Fill with base color
+        ctx.fillStyle = colors[0];
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Add some random shapes
+        for (let i = 0; i < 30; i++) {
+          const x = Math.random() * canvas.width;
+          const y = Math.random() * canvas.height;
+          const size = 10 + Math.random() * 50;
+          
+          ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        // Use the canvas content as pattern
+        try {
+          const newDataUrl = canvas.toDataURL('image/png');
+          console.log('Generated emergency pattern:', newDataUrl.substring(0, 30) + '...');
+          setPatternDataUrl(newDataUrl);
+        } catch (error) {
+          console.error('Failed to create emergency pattern:', error);
+        }
+      }
+    }
+  }, [patternDataUrl, fallbackPattern]);
+
   // Memoize the post-processing function
   const applyPostProcessing = useCallback((
     canvas: HTMLCanvasElement, 
@@ -306,100 +359,51 @@ export default function PatternCanvas({
 
   // Replace the current pattern background implementation with a simpler, more robust approach
   const renderTiledBackground = () => {
+    const actualPattern = patternDataUrl || fallbackPattern;
+    
     console.log('renderTiledBackground called:', { 
-      patternDataUrl: patternDataUrl ? patternDataUrl.substring(0, 30) + '...' : null,
+      patternDataUrl: actualPattern ? actualPattern.substring(0, 30) + '...' : null,
       showSeamlessPreview,
       tileSize 
     });
     
-    if (!patternDataUrl || !showSeamlessPreview) {
+    if (!actualPattern || !showSeamlessPreview) {
       console.log('Not rendering tiled background - missing data or not in seamless preview mode');
       return null;
     }
     
-    // Calculate tiles based on viewport size estimation
-    // For better performance, we'll calculate exactly how many tiles are needed rather than using a fixed number
-    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
-    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-    
-    // Add extra tiles to ensure coverage when scrolling/resizing
-    const tilesX = Math.ceil(viewportWidth / tileSize) + 2;
-    const tilesY = Math.ceil(viewportHeight / tileSize) + 2;
-    
-    console.log(`Calculating tiles: ${tilesX}x${tilesY} (${tilesX * tilesY} total) based on viewport ${viewportWidth}x${viewportHeight} and tileSize ${tileSize}`);
-    
-    // Create an array of tiles
-    const tiles = [];
-    // Only render what's needed based on screen size
-    const maxTiles = 1000; // Safety limit
-    let tileCount = 0;
-    
-    for (let y = 0; y < tilesY; y++) {
-      for (let x = 0; x < tilesX; x++) {
-        if (tileCount >= maxTiles) break;
-        
-        tiles.push(
-          <div
-            key={`tile-${x}-${y}`}
-            style={{
-              position: 'absolute',
-              left: `${x * tileSize}px`,
-              top: `${y * tileSize}px`,
-              width: `${tileSize}px`,
-              height: `${tileSize}px`,
-              backgroundImage: `url("${patternDataUrl}")`,
-              backgroundSize: '100% 100%',
-              backgroundRepeat: 'no-repeat',
-              zIndex: 10,
-            }}
-          />
-        );
-        
-        tileCount++;
-      }
-    }
-    
-    console.log(`Generated ${tiles.length} tile elements`);
-    
-    // Alternative approach for extremely large tile sizes
-    if (tileSize >= 200 || tiles.length === 0) {
-      console.log('Using alternative large-tile rendering approach');
-      return (
-        <div 
-          className="absolute inset-0 overflow-hidden"
-          style={{ 
-            zIndex: fullscreenPreview ? 20 : 15,
-            backgroundImage: `url("${patternDataUrl}")`,
-            backgroundRepeat: 'repeat',
-            backgroundSize: `${tileSize}px ${tileSize}px`,
-          }}
-        />
-      );
-    }
-    
-    // Standard approach for regular tile sizes
-    console.log('Using standard tiles rendering approach');
+    // For simplicity, use direct CSS for tiling - this is more reliable
+    console.log('Using direct CSS background-image for tiling');
     return (
       <div 
         className="absolute inset-0 overflow-hidden"
-        style={{ zIndex: fullscreenPreview ? 20 : 15 }}
-      >
-        {tiles}
-      </div>
+        style={{ 
+          zIndex: fullscreenPreview ? 20 : 15,
+          backgroundImage: `url("${actualPattern}")`,
+          backgroundRepeat: 'repeat',
+          backgroundSize: `${tileSize}px ${tileSize}px`,
+          border: process.env.NODE_ENV === 'development' ? '2px solid cyan' : 'none'
+        }}
+      />
     );
   };
 
   // Fallback direct CSS background pattern (simpler approach)
   const renderSimpleBackground = () => {
-    if (!patternDataUrl || !showSeamlessPreview) return null;
+    const actualPattern = patternDataUrl || fallbackPattern;
     
-    console.log('Rendering simple background approach');
+    if (!actualPattern || !showSeamlessPreview) {
+      console.log('Not rendering simple background - conditions not met');
+      return null;
+    }
+    
+    console.log('Rendering simple background approach with pattern:', actualPattern.substring(0, 30) + '...');
     
     return (
       <div 
         className="absolute inset-0 overflow-hidden" 
         style={{
-          backgroundImage: `url('${patternDataUrl}')`,
+          backgroundImage: `url('${actualPattern}')`,
           backgroundRepeat: 'repeat',
           backgroundSize: `${tileSize}px ${tileSize}px`,
           zIndex: fullscreenPreview ? 20 : 15,
@@ -433,11 +437,24 @@ export default function PatternCanvas({
         {/* Render multiple pattern backgrounds using different approaches for debugging */}
         {showSeamlessPreview && (
           <>
-            {/* First try the optimized approach */}
+            {/* First approach */}
             {renderTiledBackground()}
             
-            {/* Fallback to simpler approach if needed */}
+            {/* Second approach as backup */}
             {renderSimpleBackground()}
+            
+            {/* Emergency fallback - always show something */}
+            <div className="absolute inset-0 overflow-hidden" 
+              style={{
+                backgroundImage: `url('${fallbackPattern}')`,
+                backgroundRepeat: 'repeat',
+                backgroundSize: '64px 64px',
+                opacity: (!patternDataUrl) ? 1 : 0,
+                zIndex: 10,
+                border: '2px solid red',
+                display: (!patternDataUrl) ? 'block' : 'none'
+              }}
+            />
           </>
         )}
 

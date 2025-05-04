@@ -222,12 +222,38 @@ export default function Home() {
       {/* Debug Element */}
       <div className="absolute top-16 left-4 z-50 bg-black bg-opacity-70 text-white text-xs p-2 rounded">
         Debug info: tileSize={tileSize}, pattern={settings.patternType}, collapsedSidebar={sidebarCollapsed.toString()}
-        <div className="mt-2 flex space-x-2">
+        <div className="mt-2 flex flex-col space-y-2">
           <button 
             onClick={() => handleRegenerate()}
             className="bg-red-500 text-white px-2 py-1 rounded"
           >
             Force Regen
+          </button>
+          <button 
+            onClick={() => {
+              setSettings(prev => ({
+                ...prev,
+                _seed: Math.random(),
+                patternType: 'tiger'
+              }));
+              console.log('Forcing tiger pattern');
+            }}
+            className="bg-blue-500 text-white px-2 py-1 rounded"
+          >
+            Tiger Pattern
+          </button>
+          <button 
+            onClick={() => {
+              setSettings(prev => ({
+                ...prev,
+                _seed: Math.random(),
+                patternType: 'woodland'
+              }));
+              console.log('Forcing woodland pattern');
+            }}
+            className="bg-green-500 text-white px-2 py-1 rounded"
+          >
+            Woodland Pattern
           </button>
         </div>
       </div>
