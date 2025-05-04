@@ -268,8 +268,14 @@ export default function PatternCanvas({
   // Force pattern display with direct DOM manipulation (keep this for reliable display)
   useEffect(() => {
     if (patternDataUrl && fullscreenPreview && showSeamlessPreview) {
-      // We don't need to create DOM elements directly since we're using React
-      // The pattern is already displayed via the patternDataUrl in the JSX return
+      // Re-enable the direct DOM manipulation for reliable pattern display
+      const backgroundElem = document.getElementById('pattern-background');
+      if (backgroundElem) {
+        backgroundElem.style.backgroundImage = `url("${patternDataUrl}")`;
+        backgroundElem.style.backgroundRepeat = 'repeat';
+        backgroundElem.style.backgroundSize = `${tileSize}px ${tileSize}px`;
+        backgroundElem.style.zIndex = '20';
+      }
     }
   }, [patternDataUrl, fullscreenPreview, showSeamlessPreview, tileSize]);
 
@@ -286,6 +292,28 @@ export default function PatternCanvas({
       onTileSizeChange(newSize);
     }
   };
+
+  // Ensure pattern is regenerated when tile size changes drastically
+  useEffect(() => {
+    // Only trigger regeneration for significant tile size changes to avoid excessive rendering
+    const prevTileSize = prevSettingsRef.current?.tileSize;
+    if (prevTileSize && Math.abs(prevTileSize - tileSize) > 64) {
+      const canvas = canvasRef.current;
+      if (canvas && patternDataUrl) {
+        // Force a redraw of the tiled background
+        const backgroundElem = document.getElementById('pattern-background');
+        if (backgroundElem) {
+          backgroundElem.style.backgroundSize = `${tileSize}px ${tileSize}px`;
+        }
+      }
+    }
+    
+    // Update the ref with current tile size
+    prevSettingsRef.current = {
+      ...prevSettingsRef.current,
+      tileSize: tileSize
+    };
+  }, [tileSize, patternDataUrl]);
 
   return (
     <div className={`flex flex-col ${fullscreenPreview ? 'absolute inset-0' : 'items-center justify-center'} bg-gray-900 p-0 flex-1 relative`}>
@@ -321,7 +349,7 @@ export default function PatternCanvas({
               left: 0,
               width: '100%',
               height: '100%',
-              zIndex: 20
+              zIndex: fullscreenPreview ? 20 : 15
             }}
             id="pattern-background"
           />

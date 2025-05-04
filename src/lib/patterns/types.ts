@@ -51,6 +51,7 @@ export interface PatternSettings {
   sharpness: number;
   colors: string[];
   _seed?: number;  // Optional property for forcing pattern regeneration
+  tileSize?: number; // Optional property for tile size in seamless mode
 }
 
 // Export format type
