@@ -1,103 +1,264 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import PatternControls from '@/components/PatternControls';
+import PatternCanvas from '@/components/PatternCanvas';
+import PatternGallery from '@/components/PatternGallery';
+import { PatternSettings, PatternType } from '@/lib/patterns/types';
+import PatternFactory from '@/lib/patterns/patternFactory';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const hasInitializedRef = useRef(false);
+  const [initCount, setInitCount] = useState(0);
+  const [windowDimensions, setWindowDimensions] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0,
+  });
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  // Initialize pattern settings with defaults
+  const [settings, setSettings] = useState<PatternSettings>({
+    patternType: 'woodland',
+    scale: 50,
+    complexity: 60,
+    contrast: 60,
+    sharpness: 50,
+    colors: PatternFactory.getPresetColors('woodland'),
+    _seed: Math.random() // Add initial seed
+  });
+  
+  // Add tile size state
+  const [tileSize, setTileSize] = useState(128);
+  
+  // Gallery storage
+  const [galleryItems, setGalleryItems] = useState<string[]>([]);
+  
+  // UI state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+      // Force redraw the pattern on significant resize
+      if (Math.abs(windowDimensions.width - window.innerWidth) > 100 ||
+          Math.abs(windowDimensions.height - window.innerHeight) > 100) {
+        handleRegenerate();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [windowDimensions]);
+  
+  // Handle changes to pattern settings
+  const handleSettingsChange = useCallback((newSettings: Partial<PatternSettings>) => {
+    setSettings(prev => ({
+      ...prev,
+      ...newSettings
+    }));
+  }, []);
+  
+  // Handle tile size change
+  const handleTileSizeChange = useCallback((newSize: number) => {
+    setTileSize(newSize);
+  }, []);
+  
+  // Force regenerate the current pattern
+  const handleRegenerate = useCallback(() => {
+    // Simply update a random value to trigger re-render
+    setSettings(prev => {
+      const newSettings = {
+        ...prev,
+        _seed: Math.random() // This doesn't affect the pattern directly, just forces a re-render
+      };
+      return newSettings;
+    });
+  }, []);
+  
+  // Add pattern to gallery with size limit
+  const handleAddToGallery = useCallback((dataUrl: string) => {
+    // Only add if it's not already in the gallery
+    setGalleryItems(prevItems => {
+      if (prevItems.includes(dataUrl)) {
+        return prevItems;
+      }
+      
+      // Keep only the most recent items to prevent localStorage quota issues
+      const newGallery = [...prevItems, dataUrl];
+      // Limit to 5 items max
+      return newGallery.length > 5 ? newGallery.slice(-5) : newGallery;
+    });
+  }, []);
+
+  // Ensure the app initiates pattern generation immediately
+  useEffect(() => {
+    // Force generation on first load
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      
+      // Force immediate regeneration
+      setTimeout(() => {
+        handleRegenerate();
+      }, 200);
+      
+      // And another one after a delay to ensure it works
+      setTimeout(() => {
+        setInitCount(c => c + 1);
+      }, 1000);
+    }
+  }, [handleRegenerate]);
+
+  // Force regenerate when init count changes
+  useEffect(() => {
+    if (initCount > 0) {
+      handleRegenerate();
+    }
+  }, [initCount, handleRegenerate]);
+
+  // Load gallery from localStorage on first load
+  useEffect(() => {
+    const savedGallery = localStorage.getItem('camo-gen-gallery');
+    if (savedGallery) {
+      try {
+        setGalleryItems(JSON.parse(savedGallery));
+      } catch (e) {
+        console.error('Failed to load gallery from localStorage', e);
+      }
+    }
+  }, []);
+  
+  /**
+   * Save gallery to localStorage when it changes
+   * Handles localStorage quota limitations by limiting the number of saved items
+   */
+  useEffect(() => {
+    if (galleryItems.length > 0) {
+      try {
+        // Limit number of gallery items to prevent quota issues
+        const limitedItems = galleryItems.slice(-5); // Only keep the most recent 5 patterns
+        localStorage.setItem('camo-gen-gallery', JSON.stringify(limitedItems));
+      } catch (e) {
+        console.error('Failed to save gallery to localStorage:', e);
+        // If we hit a quota error, try saving fewer items
+        try {
+          const singleItem = galleryItems.slice(-1); // Just keep the latest one
+          localStorage.setItem('camo-gen-gallery', JSON.stringify(singleItem));
+        } catch (retryError) {
+          console.error('Still failed to save gallery to localStorage:', retryError);
+        }
+      }
+    }
+  }, [galleryItems]);
+  
+  // Handle pattern selection from gallery
+  const handleSelectPattern = useCallback((dataUrl: string) => {
+    // Create a temporary image to extract pattern data
+    const img = new Image();
+    img.src = dataUrl;
+    
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) return;
+      
+      // Draw the selected pattern to the canvas
+      ctx.drawImage(img, 0, 0);
+      
+      // For now, just trigger a redraw
+      handleRegenerate();
+    };
+  }, [handleRegenerate]);
+
+  // Toggle sidebar collapsed state
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(prev => !prev);
+  }, []);
+
+  return (
+    <main className="flex flex-col h-screen bg-gray-900 overflow-hidden relative">
+      {/* Header */}
+      <header className="bg-red-500 text-white p-2 flex items-center justify-between z-50">
+        <h1 className="font-bold text-xl tracking-wider uppercase">
+          CAMO-GEN
+        </h1>
+        <div className="flex items-center">
+          <span className="text-xs uppercase mr-4">Seamless Pattern Generator</span>
+          <button 
+            onClick={() => {
+              handleRegenerate();
+            }}
+            className="bg-white text-red-500 px-2 py-1 text-xs rounded hover:bg-gray-200"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            Regenerate
+          </button>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      </header>
+      
+      {/* Base background color layer */}
+      <div
+        className="absolute inset-0 z-0"
+        style={{
+          backgroundColor: '#4c5e3d', // Base green color as fallback
+        }}
+      />
+      
+      {/* Full-screen pattern preview */}
+      <div className="flex-1 relative overflow-hidden">
+        {/* Pattern Canvas component */}
+        <PatternCanvas 
+          key={`canvas-${settings._seed}-${windowDimensions.width}-${windowDimensions.height}`}
+          settings={settings}
+          onAddToGallery={handleAddToGallery}
+          fullscreenPreview={true}
+          tileSize={tileSize}
+          onTileSizeChange={handleTileSizeChange}
+        />
+        
+        {/* Floating toolbar toggle button */}
+        <button 
+          className="absolute top-4 right-4 z-50 bg-red-500 text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-all"
+          onClick={toggleSidebar}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            viewBox="0 0 24 24" 
+            fill="currentColor" 
+            className={`w-6 h-6 transition-transform duration-300 ${sidebarCollapsed ? 'rotate-180' : ''}`}
+          >
+            <path d="M6.75 12a.75.75 0 01-.75-.75V6a.75.75 0 011.5 0v5.25a.75.75 0 01-.75.75zm4.5 0a.75.75 0 01-.75-.75V2.25a.75.75 0 011.5 0v9a.75.75 0 01-.75.75zm4.5 0a.75.75 0 01-.75-.75V9a.75.75 0 011.5 0v2.25a.75.75 0 01-.75.75z" />
+          </svg>
+        </button>
+        
+        {/* Floating controls panel */}
+        <div 
+          className={`absolute top-4 right-16 z-40 transition-all duration-300 transform ${
+            sidebarCollapsed ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'
+          }`}
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          <div className="bg-gray-900 bg-opacity-90 rounded-lg shadow-2xl border border-red-500 backdrop-blur-sm">
+            <PatternControls 
+              settings={settings}
+              onSettingsChange={handleSettingsChange}
+              onRegenerate={handleRegenerate}
+              compact={true}
+              tileSize={tileSize}
+              onTileSizeChange={handleTileSizeChange}
+            />
+          </div>
+        </div>
+        
+        {/* Gallery at bottom */}
+        <PatternGallery 
+          galleryItems={galleryItems}
+          onSelectPattern={handleSelectPattern}
+        />
+      </div>
+    </main>
   );
 }

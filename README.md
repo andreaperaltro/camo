@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CAMO-GEN: Seamless Camouflage Pattern Generator
+
+CAMO-GEN is a advanced web application for generating and customizing seamless camouflage patterns for design, art, and gaming applications.
+
+## Features
+
+- **Multiple Pattern Types**: Including Woodland, Desert, Urban, Digital, Tiger Stripe, and Flecktarn.
+- **Seamless Pattern Generation**: Create patterns that can be tiled without visible seams.
+- **Real-time Customization**: Adjust scale, complexity, contrast, and sharpness to perfect your pattern.
+- **Color Customization**: Customize the color palette for any pattern.
+- **Pattern Gallery**: Save your favorite patterns for later use.
+- **Export Options**: Download patterns as PNG or SVG files.
+- **Full-screen Preview**: View your patterns in a tiled grid to see how they repeat.
+- **Responsive Design**: Works on desktop and mobile devices.
+
+## Technical Improvements
+
+The application has been significantly improved from the original version:
+
+1. **Performance Optimization**:
+   - Added memoization with useCallback to prevent unnecessary renders
+   - Implemented prevSettingsRef to compare settings and only regenerate when actual changes occur
+   - Added proper patterns tiling using div elements instead of CSS background-image
+
+2. **UI Enhancements**:
+   - Created collapsible sections with toggle buttons
+   - Added full-screen mode with a floating toolbar
+   - Implemented a gallery at the bottom of the screen
+
+3. **Pattern Generation**:
+   - Enhanced all pattern algorithms to be more responsive to settings
+   - Added seamless pattern verification
+   - Improved edge handling for seamless tiling
+
+4. **Stability**:
+   - Added error handling for pattern generation
+   - Improved download functionality with status indicators
+   - Fixed issues with canvas resizing and window dimensions
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+ and npm/yarn
+
+### Installation
+
+1. Clone the repository:
+```
+git clone https://github.com/yourusername/camo-gen.git
+cd camo-gen/camo-gen-next-fixed
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Start the development server:
+```
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Open your browser to http://localhost:3000
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+1. **Select a Pattern Type**: Choose from Woodland, Desert, Urban, Digital, etc.
+2. **Customize Settings**: Adjust scale, complexity, contrast, and sharpness.
+3. **Change Colors**: Modify the color palette to suit your needs.
+4. **Preview**: Toggle the seamless preview to see how the pattern will tile.
+5. **Export**: Download your pattern as PNG or SVG.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Deploy on Vercel
+## Acknowledgments
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Pattern algorithms inspired by real-world camouflage designs
+- Perlin noise implementation adapted from p5.js
