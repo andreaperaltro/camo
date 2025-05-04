@@ -57,12 +57,16 @@ export default function PatternCanvas({
   
   // Debug logger for tiling preview issues
   const debugPattern = (message: string) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[PatternDebug] ${message}`);
-    }
+    console.log(`[PatternDebug] ${message}`);
   };
   
   const tileSize = propTileSize !== undefined ? propTileSize : internalTileSize;
+  
+  // Log when component renders
+  useEffect(() => {
+    console.log(`PatternCanvas rendered. fullscreenPreview: ${fullscreenPreview}, showSeamlessPreview: ${showSeamlessPreview}, tileSize: ${tileSize}`);
+    console.log(`Has pattern data URL: ${!!patternDataUrl}`);
+  });
   
   // Memoize the post-processing function
   const applyPostProcessing = useCallback((
@@ -133,6 +137,8 @@ export default function PatternCanvas({
 
   // Generate pattern when settings change
   useEffect(() => {
+    console.log('Pattern generation triggered with settings:', settings);
+    
     // Skip checking for changes on initial render
     if (initialRenderRef.current) {
       initialRenderRef.current = false;
@@ -144,19 +150,27 @@ export default function PatternCanvas({
         // Both have _seed property, check if forced regeneration was requested
         const forceRegenerate = prevSettingsRef.current._seed !== settings._seed;
         if (!forceRegenerate) {
+          console.log('No need to regenerate pattern, skipping');
           return; // No need to regenerate
         }
       }
     }
     
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      console.error('Canvas reference is null, cannot generate pattern');
+      return;
+    }
     
     const generatePattern = async () => {
+      console.log('Starting pattern generation...');
       setIsGenerating(true);
       
       const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      if (!ctx) {
+        console.error('Could not get canvas context');
+        return;
+      }
       
       try {
         // Clear the canvas
@@ -190,6 +204,7 @@ export default function PatternCanvas({
         
         // Set the pattern data URL for the background
         const dataUrl = canvas.toDataURL('image/png');
+        console.log('Pattern data URL generated:', dataUrl.substring(0, 50) + '...');
         setPatternDataUrl(dataUrl);
         
         // Add to gallery
@@ -201,6 +216,7 @@ export default function PatternCanvas({
         console.error('Error generating pattern:', error);
       } finally {
         setIsGenerating(false);
+        console.log('Pattern generation completed');
       }
     };
     
@@ -290,7 +306,16 @@ export default function PatternCanvas({
 
   // Replace the current pattern background implementation with a simpler, more robust approach
   const renderTiledBackground = () => {
-    if (!patternDataUrl || !showSeamlessPreview) return null;
+    console.log('renderTiledBackground called:', { 
+      patternDataUrl: patternDataUrl ? patternDataUrl.substring(0, 30) + '...' : null,
+      showSeamlessPreview,
+      tileSize 
+    });
+    
+    if (!patternDataUrl || !showSeamlessPreview) {
+      console.log('Not rendering tiled background - missing data or not in seamless preview mode');
+      return null;
+    }
     
     // Calculate tiles based on viewport size estimation
     // For better performance, we'll calculate exactly how many tiles are needed rather than using a fixed number
@@ -300,6 +325,8 @@ export default function PatternCanvas({
     // Add extra tiles to ensure coverage when scrolling/resizing
     const tilesX = Math.ceil(viewportWidth / tileSize) + 2;
     const tilesY = Math.ceil(viewportHeight / tileSize) + 2;
+    
+    console.log(`Calculating tiles: ${tilesX}x${tilesY} (${tilesX * tilesY} total) based on viewport ${viewportWidth}x${viewportHeight} and tileSize ${tileSize}`);
     
     // Create an array of tiles
     const tiles = [];
@@ -332,8 +359,11 @@ export default function PatternCanvas({
       }
     }
     
+    console.log(`Generated ${tiles.length} tile elements`);
+    
     // Alternative approach for extremely large tile sizes
     if (tileSize >= 200 || tiles.length === 0) {
+      console.log('Using alternative large-tile rendering approach');
       return (
         <div 
           className="absolute inset-0 overflow-hidden"
@@ -348,6 +378,7 @@ export default function PatternCanvas({
     }
     
     // Standard approach for regular tile sizes
+    console.log('Using standard tiles rendering approach');
     return (
       <div 
         className="absolute inset-0 overflow-hidden"
@@ -355,6 +386,27 @@ export default function PatternCanvas({
       >
         {tiles}
       </div>
+    );
+  };
+
+  // Fallback direct CSS background pattern (simpler approach)
+  const renderSimpleBackground = () => {
+    if (!patternDataUrl || !showSeamlessPreview) return null;
+    
+    console.log('Rendering simple background approach');
+    
+    return (
+      <div 
+        className="absolute inset-0 overflow-hidden" 
+        style={{
+          backgroundImage: `url('${patternDataUrl}')`,
+          backgroundRepeat: 'repeat',
+          backgroundSize: `${tileSize}px ${tileSize}px`,
+          zIndex: fullscreenPreview ? 20 : 15,
+          opacity: 1,
+          border: '2px solid magenta'
+        }}
+      />
     );
   };
 
@@ -378,8 +430,16 @@ export default function PatternCanvas({
           zIndex: 5
         }}
       >
-        {/* New tiled background rendering approach */}
-        {renderTiledBackground()}
+        {/* Render multiple pattern backgrounds using different approaches for debugging */}
+        {showSeamlessPreview && (
+          <>
+            {/* First try the optimized approach */}
+            {renderTiledBackground()}
+            
+            {/* Fallback to simpler approach if needed */}
+            {renderSimpleBackground()}
+          </>
+        )}
 
         {/* Loading overlay */}
         {isGenerating && (
@@ -435,6 +495,7 @@ export default function PatternCanvas({
           <button 
             className={`${showSeamlessPreview ? 'bg-gray-600' : 'bg-red-500'} text-white border-none py-3 px-4 cursor-pointer uppercase font-bold hover:bg-red-600 transition-colors relative col-span-3`}
             onClick={() => {
+              console.log(`Toggle Seamless Preview button clicked. Current state: ${showSeamlessPreview}, switching to: ${!showSeamlessPreview}`);
               setShowSeamlessPreview(!showSeamlessPreview);
             }}
             disabled={isGenerating}
