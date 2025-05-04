@@ -43,7 +43,7 @@ export default class TigerStripePattern extends BasePattern {
       color: colors[1], // Olive green
       stripeCount: 5 + Math.floor((complexity / 100) * 5), // Number of major stripe groups
       stripeWidth: 25 * scaleFactor,
-      orientation: orientation || 45,
+      orientation: typeof orientation === 'number' ? orientation : 45,
       irregularity: 0.3 + (complexity / 100) * 0.4
     });
     
@@ -54,7 +54,7 @@ export default class TigerStripePattern extends BasePattern {
         baseColor: colors[1], // Stripe along the olive areas
         stripeWidth: 8 * scaleFactor,
         stripeDensity: 0.4 + (complexity / 100) * 0.5,
-        orientation: orientation || 45,
+        orientation: typeof orientation === 'number' ? orientation : 45,
         irregularity: 0.4 + (complexity / 100) * 0.5
       });
     }
