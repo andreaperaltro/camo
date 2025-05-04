@@ -55,6 +55,13 @@ export default function PatternCanvas({
   const [patternDataUrl, setPatternDataUrl] = useState<string | null>(null);
   const [internalTileSize, setInternalTileSize] = useState(fullscreenPreview ? 128 : 128);
   
+  // Debug logger for tiling preview issues
+  const debugPattern = (message: string) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[PatternDebug] ${message}`);
+    }
+  };
+  
   const tileSize = propTileSize !== undefined ? propTileSize : internalTileSize;
   
   // Memoize the post-processing function
@@ -190,6 +197,23 @@ export default function PatternCanvas({
         
         // Update prev settings reference
         prevSettingsRef.current = {...settings};
+
+        // Directly update the background if it exists
+        if (showSeamlessPreview) {
+          setTimeout(() => {
+            const bgElement = getOrCreatePatternBackground();
+            if (bgElement) {
+              bgElement.style.backgroundImage = `url("${dataUrl}")`;
+              bgElement.style.backgroundSize = `${tileSize}px ${tileSize}px`;
+              bgElement.style.backgroundRepeat = 'repeat';
+              bgElement.style.zIndex = fullscreenPreview ? '20' : '15';
+              bgElement.style.opacity = '1';
+              bgElement.style.visibility = 'visible';
+              bgElement.style.display = 'block';
+              debugPattern('Updated pattern from generate function');
+            }
+          }, 50);
+        }
       } catch (error) {
         console.error('Error generating pattern:', error);
       } finally {
@@ -198,7 +222,7 @@ export default function PatternCanvas({
     };
     
     generatePattern();
-  }, [settings, onAddToGallery, applyPostProcessing]);
+  }, [settings, onAddToGallery, applyPostProcessing, showSeamlessPreview, tileSize, fullscreenPreview]);
 
   // Download the pattern
   const downloadPattern = (format: ExportFormat) => {
@@ -265,20 +289,89 @@ export default function PatternCanvas({
     return svgData;
   };
 
-  // Force pattern display with direct DOM manipulation (keep this for reliable display)
+  // Enhanced direct DOM manipulation for pattern display - will run on every relevant state change
   useEffect(() => {
-    if (patternDataUrl && fullscreenPreview && showSeamlessPreview) {
-      // Re-enable the direct DOM manipulation for reliable pattern display
-      const backgroundElem = document.getElementById('pattern-background');
-      if (backgroundElem) {
-        backgroundElem.style.backgroundImage = `url("${patternDataUrl}")`;
-        backgroundElem.style.backgroundRepeat = 'repeat';
-        backgroundElem.style.backgroundSize = `${tileSize}px ${tileSize}px`;
-        backgroundElem.style.zIndex = '20';
+    // Only manipulate DOM when we have a pattern and seamless preview is enabled
+    if (patternDataUrl && showSeamlessPreview) {
+      debugPattern(`Direct DOM manipulation - Legacy callback`);
+    }
+  }, [patternDataUrl, showSeamlessPreview, tileSize, fullscreenPreview]);
+
+  // Fix tiling issues
+  useEffect(() => {
+    if (patternDataUrl && showSeamlessPreview) {
+      debugPattern('Updating background element');
+      
+      // Use a larger timeout to ensure DOM is ready
+      const timeoutId = setTimeout(() => {
+        const bgElement = getOrCreatePatternBackground();
+        if (bgElement) {
+          debugPattern('Found background element, updating styles');
+          bgElement.style.backgroundImage = `url('${patternDataUrl}')`;
+          bgElement.style.backgroundSize = `${tileSize}px ${tileSize}px`;
+          bgElement.style.backgroundRepeat = 'repeat';
+          bgElement.style.opacity = '1';
+          bgElement.style.visibility = 'visible';
+          bgElement.style.display = 'block';
+        }
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [patternDataUrl, showSeamlessPreview, tileSize]);
+  
+  // Also ensure correct display when showSeamlessPreview changes
+  useEffect(() => {
+    if (showSeamlessPreview) {
+      setTimeout(() => {
+        const bgElement = getOrCreatePatternBackground();
+        if (bgElement && patternDataUrl) {
+          bgElement.style.backgroundImage = `url('${patternDataUrl}')`;
+          bgElement.style.display = 'block';
+          bgElement.style.visibility = 'visible';
+          bgElement.style.opacity = '1';
+          debugPattern('Showing seamless preview');
+        }
+      }, 50);
+    } else {
+      const bgElement = document.getElementById('pattern-background');
+      if (bgElement) {
+        bgElement.style.opacity = '0';
+        bgElement.style.visibility = 'hidden';
+        debugPattern('Hiding seamless preview');
       }
     }
-  }, [patternDataUrl, fullscreenPreview, showSeamlessPreview, tileSize]);
+  }, [showSeamlessPreview, patternDataUrl]);
 
+  // Safely get pattern background element or create it if it doesn't exist
+  const getOrCreatePatternBackground = () => {
+    let element = document.getElementById('pattern-background');
+    
+    if (!element) {
+      debugPattern('Creating missing pattern background element');
+      const container = document.querySelector('.pattern-display-area');
+      
+      if (container) {
+        element = document.createElement('div');
+        element.id = 'pattern-background';
+        element.className = 'absolute inset-0';
+        element.style.position = 'absolute';
+        element.style.top = '0';
+        element.style.left = '0';
+        element.style.width = '100%';
+        element.style.height = '100%';
+        element.style.zIndex = fullscreenPreview ? '20' : '15';
+        
+        container.appendChild(element);
+        debugPattern('Successfully created new background element');
+      } else {
+        debugPattern('ERROR: Could not find container .pattern-display-area');
+      }
+    }
+    
+    return element;
+  };
+  
   // Tile size slider controls
   const adjustTileSize = (increment: boolean) => {
     const newSize = increment 
@@ -291,29 +384,14 @@ export default function PatternCanvas({
     if (onTileSizeChange) {
       onTileSizeChange(newSize);
     }
-  };
-
-  // Ensure pattern is regenerated when tile size changes drastically
-  useEffect(() => {
-    // Only trigger regeneration for significant tile size changes to avoid excessive rendering
-    const prevTileSize = prevSettingsRef.current?.tileSize;
-    if (prevTileSize && Math.abs(prevTileSize - tileSize) > 64) {
-      const canvas = canvasRef.current;
-      if (canvas && patternDataUrl) {
-        // Force a redraw of the tiled background
-        const backgroundElem = document.getElementById('pattern-background');
-        if (backgroundElem) {
-          backgroundElem.style.backgroundSize = `${tileSize}px ${tileSize}px`;
-        }
-      }
-    }
     
-    // Update the ref with current tile size
-    prevSettingsRef.current = {
-      ...prevSettingsRef.current,
-      tileSize: tileSize
-    };
-  }, [tileSize, patternDataUrl]);
+    // Immediately update the background size
+    const backgroundElem = getOrCreatePatternBackground();
+    if (backgroundElem) {
+      backgroundElem.style.backgroundSize = `${newSize}px ${newSize}px`;
+      debugPattern(`Updated tile size to ${newSize}px`);
+    }
+  };
 
   return (
     <div className={`flex flex-col ${fullscreenPreview ? 'absolute inset-0' : 'items-center justify-center'} bg-gray-900 p-0 flex-1 relative`}>
@@ -321,7 +399,7 @@ export default function PatternCanvas({
       <div 
         className={`
           ${fullscreenPreview ? 'absolute inset-0 border-0' : 'border-4 border-white mb-4 relative md:h-[calc(100%-130px)] h-60'} 
-          flex justify-center items-center overflow-hidden
+          flex justify-center items-center overflow-hidden pattern-display-area
         `}
         style={{
           backgroundImage: !showSeamlessPreview ? 
@@ -335,26 +413,21 @@ export default function PatternCanvas({
           zIndex: 5
         }}
       >
-        {/* Pattern background */}
-        {showSeamlessPreview && patternDataUrl && (
-          <div
-            className="absolute inset-0"
-            style={{
-              backgroundImage: `url("${patternDataUrl}")`,
-              backgroundRepeat: 'repeat',
-              backgroundSize: `${tileSize}px ${tileSize}px`,
-              transition: 'background-size 0.3s ease',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              zIndex: fullscreenPreview ? 20 : 15
-            }}
-            id="pattern-background"
-          />
-        )}
-      
+        {/* Static background div that will be controlled by DOM manipulation */}
+        <div
+          className="absolute inset-0"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            zIndex: fullscreenPreview ? 20 : 15,
+            display: showSeamlessPreview ? 'block' : 'none'
+          }}
+          id="pattern-background"
+        />
+
         {/* Loading overlay */}
         {isGenerating && (
           <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
